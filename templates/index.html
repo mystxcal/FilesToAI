@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FilesToAI - File Selector</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Left Column: File Tree -->
+            <div class="col-md-5">
+                <div id="path-input-container" class="form-group">
+                    <label for="path-input">Directory Path:</label>
+                    <div class="input-group">
+                        <input type="text" id="path-input" class="form-control"
+                            placeholder="e.g., C:\Users\YourName\Projects">
+                        <div class="input-group-append">
+                            <button id="load-path-button" class="btn btn-primary">
+                                <i class="fas fa-folder-open"></i> Load
+                            </button>
+                            <button id="show-history-button" class="btn btn-outline-secondary">
+                                <i class="fas fa-history"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Custom path history dropdown -->
+                    <div id="path-history-dropdown" class="custom-dropdown">
+                        <div class="dropdown-header">
+                            <span>Recent Paths</span>
+                            <button id="clear-all-history" class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-trash-alt"></i> Clear All
+                            </button>
+                        </div>
+                        <div id="path-history-items" class="dropdown-items">
+                            <!-- Will be populated with previous paths -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Section -->
+                <div class="settings-section">
+                    <h5><i class="fas fa-cog"></i> Settings</h5>
+
+                    <!-- Ignore File Controls -->
+                    <div class="form-group">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="gitignore-toggle" checked>
+                            <label class="custom-control-label" for="gitignore-toggle">Respect .gitignore</label>
+                        </div>
+                        <div class="custom-control custom-switch mt-2">
+                            <input type="checkbox" class="custom-control-input" id="pathignore-toggle">
+                            <label class="custom-control-label" for="pathignore-toggle">Use custom pathignore
+                                patterns</label>
+                        </div>
+
+                        <!-- Add pathignore textarea with Set/Apply button -->
+                        <div class="mt-2" id="pathignore-container">
+                            <label for="pathignore-input">Custom pathignore patterns:</label>
+                            <div class="input-group">
+                                <textarea class="form-control" id="pathignore-input" rows="4"
+                                    placeholder="Enter patterns to ignore (one per line, same format as .gitignore)">node_modules/
+*.log
+.DS_Store
+__pycache__/</textarea>
+                                <div class="input-group-append">
+                                    <button id="apply-pathignore" class="btn btn-outline-secondary">
+                                        <i class="fas fa-check"></i> Apply
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">Enter patterns to ignore, one per line (same format as
+                                .gitignore)</small>
+                            <button id="test-pathignore" class="btn btn-sm btn-outline-info mt-2">
+                                <i class="fas fa-vial"></i> Test Patterns
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Size Slider -->
+                    <div id="size-slider-container" class="form-group">
+                        <label for="size-slider">Maximum File Size:</label>
+                        <div class="d-flex align-items-center">
+                            <input type="range" id="size-slider" class="form-control-range" min="25" max="500" step="25"
+                                value="250">
+                            <span id="size-slider-value">250 KB</span>
+                        </div>
+                    </div>
+
+                    <!-- Extension Filter -->
+                    <div id="extension-filter-container" class="form-group">
+                        <label for="extension-input">Quick Select by Extensions:</label>
+                        <div class="input-group">
+                            <input type="text" id="extension-input" class="form-control" 
+                                placeholder="Type extension (e.g. .js) and press Enter">
+                            <div class="input-group-append">
+                                <button id="add-extension" class="btn btn-outline-secondary">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Build a list of extensions to quickly select multiple files</small>
+                        
+                        <div id="extension-pills" class="mt-2"></div>
+                        
+                        <div class="common-extensions mt-2">
+                            <small class="d-block mb-1">Common extensions:</small>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".js">.js</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".ts">.ts</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".py">.py</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".java">.java</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".cpp">.cpp</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".c">.c</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".rb">.rb</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".go">.go</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".php">.php</button>
+                            
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".html">.html</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".css">.css</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".jsx">.jsx</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".tsx">.tsx</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".vue">.vue</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".svelte">.svelte</button>
+                            
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".json">.json</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".yml">.yml</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".yaml">.yaml</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".xml">.xml</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".sql">.sql</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".toml">.toml</button>
+                            
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".md">.md</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".txt">.txt</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".rst">.rst</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".csv">.csv</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".sh">.sh</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".bat">.bat</button>
+                            <button class="btn btn-sm btn-outline-secondary ext-pill-btn" data-ext=".ps1">.ps1</button>
+                            
+                            <button id="clear-extensions" class="btn btn-sm btn-outline-danger ml-1">
+                                <i class="fas fa-times-circle"></i> Clear All
+                            </button>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button id="apply-extension-selection" class="btn btn-outline-success">
+                                <i class="fas fa-check-square"></i> Select Files with These Extensions
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Extension Hide Filter -->
+                    <div id="extension-hide-container" class="form-group mt-4">
+                        <label for="extension-hide-input">Ignore by Extensions:</label>
+                        <div class="input-group">
+                            <input type="text" id="extension-hide-input" class="form-control" 
+                                placeholder="Type extension to hide (e.g. .min.js)">
+                            <div class="input-group-append">
+                                <button id="add-hide-extension" class="btn btn-outline-secondary">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Files with these extensions will be unselected and hidden from view</small>
+                        
+                        <div id="hide-extension-pills" class="mt-2"></div>
+                        
+                        <div class="common-extensions mt-2">
+                            <small class="d-block mb-1">Common extensions to ignore:</small>
+                            <!-- Minified and source maps -->
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".min.js">.min.js</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".min.css">.min.css</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".map">.map</button>
+                            
+                            <!-- Binary and compiled files -->
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".pyc">.pyc</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".exe">.exe</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".dll">.dll</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".so">.so</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".o">.o</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".obj">.obj</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".class">.class</button>
+                            
+                            <!-- Image files -->
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".png">.png</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".jpg">.jpg</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".jpeg">.jpeg</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".gif">.gif</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".ico">.ico</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".svg">.svg</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".webp">.webp</button>
+                            
+                            <!-- System and temp files -->
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".log">.log</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".tmp">.tmp</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".bak">.bak</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".cache">.cache</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".DS_Store">.DS_Store</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".swp">.swp</button>
+                            
+                            <!-- Other binary formats -->
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".zip">.zip</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".tar">.tar</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".gz">.gz</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".jar">.jar</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".pdf">.pdf</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".doc">.doc</button>
+                            <button class="btn btn-sm btn-outline-secondary hide-ext-pill-btn" data-ext=".docx">.docx</button>
+                            
+                            <!-- Clear button -->
+                            <button id="clear-hide-extensions" class="btn btn-sm btn-outline-danger ml-1">
+                                <i class="fas fa-times-circle"></i> Clear All
+                            </button>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button id="apply-extension-hide" class="btn btn-outline-secondary">
+                                <i class="fas fa-eye-slash"></i> Hide Files with These Extensions
+                            </button>
+                            <button id="show-all-files" class="btn btn-outline-info">
+                                <i class="fas fa-eye"></i> Show All Files
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Controls -->
+                <div class="quick-controls">
+                    <button id="select-all" class="btn btn-outline-secondary">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button id="deselect-all" class="btn btn-outline-secondary">
+                        <i class="fas fa-square"></i> Deselect All
+                    </button>
+                    <button id="expand-all" class="btn btn-outline-secondary">
+                        <i class="fas fa-plus-square"></i> Expand All
+                    </button>
+                    <button id="collapse-all" class="btn btn-outline-secondary">
+                        <i class="fas fa-minus-square"></i> Collapse All
+                    </button>
+                    <button id="generate-project-map" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-sitemap"></i> Generate Project Map
+                    </button>
+                    <button id="generate-full-project-map" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-sitemap"></i> Generate Full Project Map
+                    </button>
+                    <button id="generate-button" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-file-code"></i> Generate Output
+                    </button>
+                </div>
+
+                <div id="file-tree">{{ file_tree_html | safe }}</div>
+                <div class="loading-spinner">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Loading...
+                </div>
+
+                <div id="error-message"></div>
+            </div>
+            <div class="col-md-7">
+                <!-- App Title and Info -->
+                <div class="app-title-container">
+                    <h1 class="app-title"><i class="fas fa-code-branch"></i> FilesToAI</h1>
+                </div>
+                
+                <!-- Output Statistics Section -->
+                <div class="output-section" id="output-stats">
+                    <h5>Output Statistics
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary copy-stats-button"><i class="fas fa-copy"></i>
+                                Copy</button>
+                            <button class="btn btn-outline-secondary refresh-stats-button">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </h5>
+                    <div class="stats-container">
+                        <div class="stat-item">
+                            <span class="stat-label">Combined Files Size:</span>
+                            <span class="stat-value" id="output-size">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Character Count:</span>
+                            <span class="stat-value" id="char-count">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Estimated Tokens:</span>
+                            <span class="stat-value" id="token-count">-</span>
+                            <span class="stat-info" title="Estimated using characters ÷ 4">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Selected Files:</span>
+                            <span class="stat-value" id="selected-files-count">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- files.txt Output -->
+                <div class="output-section" id="files-output">
+                    <h5>files.txt
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary copy-button"><i class="fas fa-copy"></i>
+                                Copy</button>
+                            <button class="btn btn-outline-secondary download-button" data-filename="files.txt">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </h5>
+                    <textarea readonly></textarea>
+                </div>
+
+                <!-- project_map.txt Output -->
+                <div class="output-section" id="project-map-output">
+                    <h5>project_map.txt
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary copy-button"><i class="fas fa-copy"></i>
+                                Copy</button>
+                            <button class="btn btn-outline-secondary download-button" data-filename="project_map.txt">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </h5>
+                    <textarea readonly></textarea>
+                </div>
+                
+                <!-- Combined Output Actions -->
+                <div class="combined-actions text-center mb-3">
+                    <button id="copy-all-button" class="btn btn-outline-primary mr-2">
+                        <i class="fas fa-copy"></i> Copy All Content
+                    </button>
+                    <button id="download-all-button" class="btn btn-outline-primary">
+                        <i class="fas fa-download"></i> Download All Content
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="toast-container"></div>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js" crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
+    <!-- Add the file-tree.js file -->
+    <script src="{{ url_for('static', filename='js/file-tree.js') }}"></script>
+    <script>
+        $(document).ready(function () {
+            // Initialize file tree
+            initializeFileTree();
+
+            // Initialize path history feature
+            initializePathHistory();
+
+            // --- Load initial path ---
+            $('#load-path-button').on('click', function () {
+                let absolutePath = $('#path-input').val();
+                if (absolutePath) {
+                    loadInitialFileTree(absolutePath);
+                } else {
+                    showToast('Please enter a valid directory path', 'error');
+                }
+            });
+
+            // Enter key in path input triggers load
+            $('#path-input').on('keypress', function (e) {
+                if (e.which === 13) {
+                    $('#load-path-button').click();
+                }
+            });
+
+            function loadInitialFileTree(absolutePath) {
+                showLoading(true);
+
+                // Get pathignore patterns from textarea
+                const usePathignore = $('#pathignore-toggle').is(':checked');
+                const pathignorePatterns = usePathignore ?
+                    $('#pathignore-input').val().split('\n').filter(line => line.trim() !== '') :
+                    [];
+
+                $.ajax({
+                    url: '/',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        absolute_path: absolutePath,
+                        respect_gitignore: $('#gitignore-toggle').is(':checked'),
+                        respect_pathignore: usePathignore,
+                        pathignore_patterns: pathignorePatterns
+                    }),
+                    success: function (response) {
+                        if (response.error) {
+                            showToast(response.error, 'error');
+                            return;
+                        }
+                        $('#file-tree').html(response.fileTree);
+                        // Call the new function instead of the old one
+                        resetTreeEventListeners();
+                        updateSelectedCount();
+                    },
+                    error: function (error) {
+                        console.error("AJAX Error:", error);
+                        showToast("An error occurred while loading the file tree.", 'error');
+                    },
+                    complete: function () {
+                        showLoading(false);
+                    }
+                });
+            }
+
+            // --- Quick Controls ---
+            $('#select-all').on('click', function () {
+                // Update to select both file and directory checkboxes
+                $('#file-tree .file-checkbox, #file-tree .dir-checkbox').prop('checked', true);
+                updateSelectedCount();
+            });
+
+            $('#deselect-all').on('click', function () {
+                $('#file-tree .file-checkbox, #file-tree .dir-checkbox').prop('checked', false);
+                updateSelectedCount();
+            });
+
+            $('#expand-all').on('click', function () {
+                // First show all directory subtrees
+                $('#file-tree .directory > ul').show();
+
+                // Then make sure all carets are facing down
+                $('#file-tree .expand-button i').each(function () {
+                    $(this).removeClass('fa-caret-right').addClass('fa-caret-down');
+                });
+            });
+
+            $('#collapse-all').on('click', function () {
+                // First hide all directory subtrees
+                $('#file-tree .directory > ul').hide();
+
+                // Then make sure all carets are facing right
+                $('#file-tree .expand-button i').each(function () {
+                    $(this).removeClass('fa-caret-down').addClass('fa-caret-right');
+                });
+            });
+
+            // --- Generate Project Map ---
+            $('#generate-project-map').on('click', function () {
+                // Get selected files
+                let selectedFiles = [];
+                $('.file-checkbox:checked').each(function () {
+                    selectedFiles.push($(this).data('path'));
+                });
+
+                if (selectedFiles.length === 0) {
+                    showToast("Please select at least one file.", 'error');
+                    return;
+                }
+
+                showLoading(true);
+                $.ajax({
+                    url: '/generate_output',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ selectedFiles: selectedFiles, maxSizeKB: 0 }), // maxSizeKB: 0 means we don't need file contents
+                    success: function (response) {
+                        if (response.error) {
+                            showToast(response.error, 'error');
+                        } else {
+                            showToast('Project map generated successfully!', 'success');
+                            // Only update the project map output area
+                            $('#project-map-output textarea').val(response.project_map_txt);
+                            // Clear the files.txt output area
+                            $('#files-output textarea').val('');
+                            
+                            // Update statistics after output is generated
+                            updateOutputStatistics();
+                        }
+                    },
+                    error: function (error) {
+                        console.error("AJAX Error:", error);
+                        showToast("An error occurred while generating the project map.", 'error');
+                    },
+                    complete: function () {
+                        showLoading(false);
+                    }
+                });
+            });
+
+            // --- Generate Full Project Map ---
+            $('#generate-full-project-map').on('click', function () {
+                const absoluteRoot = $('#path-input').val();
+                
+                if (!absoluteRoot) {
+                    showToast("Please load a directory first.", 'error');
+                    return;
+                }
+                
+                showLoading(true);
+                // Get all files in the directory (using API or direct scan)
+                $.ajax({
+                    url: '/api/browse',
+                    type: 'GET',
+                    data: {
+                        path: absoluteRoot,
+                        respect_gitignore: $('#gitignore-toggle').is(':checked'),
+                        respect_pathignore: $('#pathignore-toggle').is(':checked'),
+                        pathignore_patterns: $('#pathignore-input').val(),
+                        show_hidden: false,
+                        set_as_root: true
+                    },
+                    success: function (response) {
+                        if (response.error) {
+                            showToast(response.error, 'error');
+                            showLoading(false);
+                            return;
+                        }
+                        
+                        // Collect all file paths from the tree
+                        const allFiles = collectFilePaths(response.file_tree);
+                        
+                        // Now generate project map for all files
+                        $.ajax({
+                            url: '/generate_output',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ 
+                                selectedFiles: allFiles, 
+                                maxSizeKB: 0  // Don't need file contents
+                            }),
+                            success: function (mapResponse) {
+                                if (mapResponse.error) {
+                                    showToast(mapResponse.error, 'error');
+                                } else {
+                                    showToast(`Full project map generated with ${allFiles.length} files!`, 'success');
+                                    // Only update the project map output
+                                    $('#project-map-output textarea').val(mapResponse.project_map_txt);
+                                    // Clear the files.txt output area
+                                    $('#files-output textarea').val('');
+                                    
+                                    // Update statistics after output is generated
+                                    updateOutputStatistics();
+                                }
+                            },
+                            error: function (error) {
+                                console.error("AJAX Error:", error);
+                                showToast("Error generating full project map.", 'error');
+                            },
+                            complete: function () {
+                                showLoading(false);
+                            }
+                        });
+                    },
+                    error: function (error) {
+                        console.error("AJAX Error:", error);
+                        showToast("Error browsing directory structure.", 'error');
+                        showLoading(false);
+                    }
+                });
+            });
+            
+            // Helper function to collect all file paths from tree
+            function collectFilePaths(node) {
+                let paths = [];
+                
+                if (node.type === 'file') {
+                    paths.push(node.path);
+                } else if (node.type === 'directory' && node.children) {
+                    for (const child of node.children) {
+                        paths = paths.concat(collectFilePaths(child));
+                    }
+                }
+                
+                return paths;
+            }
+
+            // --- Generate Output ---
+            $('#generate-button').on('click', function () {
+                // Get selected files
+                let selectedFiles = [];
+                $('.file-checkbox:checked').each(function () {
+                    selectedFiles.push($(this).data('path'));
+                });
+
+                if (selectedFiles.length === 0) {
+                    showToast("Please select at least one file.", 'error');
+                    return;
+                }
+
+                const maxSizeKB = parseInt($('#size-slider').val(), 10);
+                showLoading(true);
+                $.ajax({
+                    url: '/generate_output',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ selectedFiles: selectedFiles, maxSizeKB: maxSizeKB }),
+                    success: function (response) {
+                        if (response.error) {
+                            showToast(response.error, 'error');
+                        } else {
+                            let message = 'Output generated successfully!';
+                            if (response.skipped_files > 0) {
+                                message += ` (${response.skipped_files} files skipped due to size)`;
+                            }
+                            if (response.binary_files > 0) {
+                                message += ` (${response.binary_files} binary files excluded)`;
+                            }
+                            showToast(message, 'success');
+                            $('#files-output textarea').val(response.files_txt);
+                            $('#project-map-output textarea').val(response.project_map_txt);
+                            
+                            // Update statistics after output is generated
+                            updateOutputStatistics();
+                        }
+                    },
+                    error: function (error) {
+                        console.error("AJAX Error:", error);
+                        showToast("An error occurred while generating the output.", 'error');
+                    },
+                    complete: function () {
+                        showLoading(false);
+                    }
+                });
+            });
+
+            // --- Copy to Clipboard using modern API ---
+            $('.copy-button').on('click', function () {
+                const textarea = $(this).closest('.output-section').find('textarea');
+                const textToCopy = textarea.val();
+
+                if (!textToCopy) {
+                    showToast("No content to copy", 'info');
+                    return;
+                }
+
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(textToCopy)
+                        .then(() => showToast("Copied to clipboard!", 'success'))
+                        .catch(err => {
+                            console.error('Clipboard write failed:', err);
+                            fallbackCopy(textarea);
+                        });
+                } else {
+                    fallbackCopy(textarea);
+                }
+            });
+
+            // --- Copy Stats Button ---
+            $('.copy-stats-button').on('click', function() {
+                // Collect stats data
+                const fileSize = $('#output-size').text();
+                const charCount = $('#char-count').text();
+                const tokenCount = $('#token-count').text();
+                const selectedFilesCount = $('#selected-files-count').text();
+                
+                // Format stats data
+                const statsText = `Output Statistics:
+Combined Files Size: ${fileSize}
+Character Count: ${charCount}
+Estimated Tokens: ${tokenCount}
+Selected Files: ${selectedFilesCount}`;
+                
+                // Copy to clipboard
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(statsText)
+                        .then(() => showToast("Statistics copied to clipboard!", 'success'))
+                        .catch(err => {
+                            console.error('Clipboard write failed:', err);
+                            // Create temporary textarea for fallback
+                            const tempTextarea = $('<textarea>').val(statsText).appendTo('body').select();
+                            fallbackCopy(tempTextarea);
+                            tempTextarea.remove();
+                        });
+                } else {
+                    const tempTextarea = $('<textarea>').val(statsText).appendTo('body').select();
+                    fallbackCopy(tempTextarea);
+                    tempTextarea.remove();
+                }
+            });
+            
+            // --- Copy All Content Button ---
+            $('#copy-all-button').on('click', function() {
+                const combinedContent = generateCombinedContent();
+                
+                if (!combinedContent) {
+                    showToast("No content to copy", 'info');
+                    return;
+                }
+                
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(combinedContent)
+                        .then(() => showToast("All content copied to clipboard!", 'success'))
+                        .catch(err => {
+                            console.error('Clipboard write failed:', err);
+                            const tempTextarea = $('<textarea>').val(combinedContent).appendTo('body').select();
+                            fallbackCopy(tempTextarea);
+                            tempTextarea.remove();
+                        });
+                } else {
+                    const tempTextarea = $('<textarea>').val(combinedContent).appendTo('body').select();
+                    fallbackCopy(tempTextarea);
+                    tempTextarea.remove();
+                }
+            });
+            
+            // --- Download All Content Button ---
+            $('#download-all-button').on('click', function() {
+                const combinedContent = generateCombinedContent();
+                
+                if (!combinedContent) {
+                    showToast("No content to download", 'info');
+                    return;
+                }
+                
+                // Create a blob and download it
+                const blob = new Blob([combinedContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "project_content.txt";
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+                
+                showToast("Downloading complete project content", 'success');
+            });
+            
+            // Helper function to generate combined content
+            function generateCombinedContent() {
+                const filesContent = $('#files-output textarea').val();
+                const projectMapContent = $('#project-map-output textarea').val();
+                
+                // Get stats data
+                const fileSize = $('#output-size').text();
+                const charCount = $('#char-count').text();
+                const tokenCount = $('#token-count').text();
+                const selectedFilesCount = $('#selected-files-count').text();
+                
+                // Build the combined content with section headers and dividers
+                let combinedContent = "";
+                
+                // Add Files section if available
+                if (filesContent) {
+                    combinedContent += "========== FILES ==========\n\n";
+                    combinedContent += filesContent;
+                    combinedContent += "\n\n";
+                }
+                
+                // Add Project Map section if available
+                if (projectMapContent) {
+                    combinedContent += "========== PROJECT MAP ==========\n\n";
+                    combinedContent += projectMapContent;
+                    combinedContent += "\n\n";
+                }
+                
+                // Add Statistics section
+                combinedContent += "========== STATISTICS ==========\n\n";
+                combinedContent += `Combined Files Size: ${fileSize}\n`;
+                combinedContent += `Character Count: ${charCount}\n`;
+                combinedContent += `Estimated Tokens: ${tokenCount}\n`;
+                combinedContent += `Selected Files: ${selectedFilesCount}\n`;
+                
+                return combinedContent;
+            }
+
+            function fallbackCopy(textarea) {
+                textarea.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showToast("Copied to clipboard!", 'success');
+                    } else {
+                        throw new Error('Copy command failed');
+                    }
+                } catch (err) {
+                    showToast("Failed to copy. Please select and copy manually.", 'error');
+                }
+            }
+
+            // --- Download functionality ---
+            $('.download-button').on('click', function () {
+                const textarea = $(this).closest('.output-section').find('textarea');
+                const content = textarea.val();
+                const filename = $(this).data('filename');
+
+                if (!content) {
+                    showToast("No content to download", 'info');
+                    return;
+                }
+
+                // Create a blob and download it
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+
+                showToast(`Downloading ${filename}`, 'success');
+            });
+
+            // Size slider
+            $('#size-slider').on('input', function () {
+                $('#size-slider-value').text($(this).val() + " KB");
+            });
+
+            // --- Helper Functions ---
+
+            // Update counter for selected files
+            function updateSelectedCount() {
+                const count = $('.file-checkbox:checked').length;
+                $('#selected-count').text(count + (count === 1 ? ' file selected' : ' files selected'));
+                if (count > 0) {
+                    $('#selected-count').addClass('selected');
+                } else {
+                    $('#selected-count').removeClass('selected');
+                }
+            }
+
+            // Show error message
+            function showError(message) {
+                $('#error-message').text(message).fadeIn();
+                setTimeout(() => $('#error-message').fadeOut(), 5000);
+            }
+
+            // Show toast notification
+            function showToast(message, type = 'info') {
+                const toast = $('<div>')
+                    .addClass(`toast toast-${type}`)
+                    .text(message);
+
+                $('.toast-container').append(toast);
+
+                // Trigger animation
+                setTimeout(() => toast.addClass('show'), 10);
+
+                // Auto remove after delay
+                setTimeout(() => {
+                    toast.removeClass('show');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+
+            // Show/hide loading spinner
+            function showLoading(show) {
+                if (show) {
+                    $('.loading-spinner').fadeIn(200);
+                } else {
+                    $('.loading-spinner').fadeOut(200);
+                }
+            }
+
+            // Add event handlers for gitignore/pathignore toggles
+            $('#gitignore-toggle, #pathignore-toggle').on('change', function () {
+                // If we already have a path loaded, refresh the view
+                const rootPath = $('#path-input').val();
+                if (rootPath) {
+                    loadInitialFileTree(rootPath);
+                }
+            });
+
+            // Toggle display of pathignore textarea based on toggle state
+            $('#pathignore-toggle').on('change', function () {
+                if ($(this).is(':checked')) {
+                    $('#pathignore-container').slideDown(200);
+                } else {
+                    $('#pathignore-container').slideUp(200);
+                }
+            });
+
+            // Initial state setup for pathignore container
+            if (!$('#pathignore-toggle').is(':checked')) {
+                $('#pathignore-container').hide();
+            }
+
+            // Add Apply button handler
+            $('#apply-pathignore').on('click', function () {
+                const rootPath = $('#path-input').val();
+                if (rootPath) {
+                    showToast('Applying pathignore patterns...', 'info');
+                    loadInitialFileTree(rootPath);
+                } else {
+                    showToast('Please enter a directory path first', 'error');
+                }
+            });
+
+            // Add Test button handler
+            $('#test-pathignore').on('click', function () {
+                testPathignorePatterns();
+            });
+
+            // Test pathignore patterns
+            function testPathignorePatterns() {
+                const patterns = $('#pathignore-input').val().split('\n').filter(line => line.trim() !== '' && !line.trim().startsWith('#'));
+                if (patterns.length === 0) {
+                    showToast('No patterns to test', 'info');
+                    return;
+                }
+
+                // Create test report
+                let report = 'PATHIGNORE PATTERN TEST\n======================\n\n';
+
+                // Test each pattern
+                for (const pattern of patterns) {
+                    if (!pattern || pattern.trim() === '') continue;
+
+                    report += `Testing pattern: "${pattern}"\n`;
+
+                    // Create sample paths that should match this pattern
+                    const testPaths = generateTestPathsForPattern(pattern);
+
+                    for (const path of testPaths) {
+                        // Simulate pattern matching logic
+                        const shouldIgnore = testPatternMatch(pattern, path);
+                        report += `  ${shouldIgnore ? '✓' : '✗'} ${path} ${shouldIgnore ? '(would be ignored)' : '(would NOT be ignored)'}\n`;
+                    }
+
+                    report += '\n';
+                }
+
+                // Show test results
+                $('#files-output textarea').val(report);
+                showToast('Pathignore test complete! Check the output panel.', 'success');
+            }
+
+            function generateTestPathsForPattern(pattern) {
+                // Generate test paths based on the pattern
+                const paths = [];
+
+                // Remove trailing slashes and wildcards for base path
+                let basePath = pattern.replace(/\/+$/, '').replace(/\*/g, 'example');
+
+                // Handle different pattern types
+                if (pattern.includes('*')) {
+                    // Handle wildcard patterns
+                    if (pattern.startsWith('*.')) {
+                        // File extension pattern (e.g., *.log)
+                        const ext = pattern.substring(1);
+                        paths.push(`file${ext}`);
+                        paths.push(`path/to/file${ext}`);
+                        paths.push(`file-without${ext.replace('.', '-')}`); // Should not match
+                    } else if (pattern.endsWith('/*')) {
+                        // Directory wildcard (e.g., node_modules/*)
+                        const dir = pattern.substring(0, pattern.length - 2);
+                        paths.push(`${dir}/file.txt`);
+                        paths.push(`${dir}/subdir/file.txt`);
+                        paths.push(`another-${dir}/file.txt`); // Should not match
+                    } else if (pattern.includes('*/')) {
+                        // Path wildcard (e.g., */temp/*)
+                        const parts = pattern.split('*/');
+                        paths.push(`something${parts.length > 1 ? '/' + parts[1] : ''}`);
+                        paths.push(`dir/something${parts.length > 1 ? '/' + parts[1] : ''}`);
+                    } else {
+                        // Generic wildcard
+                        paths.push(basePath);
+                        paths.push(`path/to/${basePath}`);
+                    }
+                } else if (pattern.endsWith('/')) {
+                    // Directory pattern
+                    const dir = pattern.substring(0, pattern.length - 1);
+                    paths.push(`${dir}/file.txt`);
+                    paths.push(`${dir}/subdir/file.txt`);
+                    paths.push(`path/to/${dir}/file.txt`);
+                } else {
+                    // Exact file or directory match
+                    paths.push(pattern);
+                    paths.push(`path/to/${pattern}`);
+                    paths.push(`${pattern}-different`); // Should not match
+                }
+
+                return paths;
+            }
+
+            function testPatternMatch(pattern, path) {
+                // Simplified pattern matching logic to simulate server-side behavior
+
+                // Convert glob pattern to regex
+                let regexPattern = pattern
+                    .replace(/\./g, '\\.')
+                    .replace(/\*/g, '.*')
+                    .replace(/\?/g, '.');
+
+                // Handle directory patterns
+                if (pattern.endsWith('/')) {
+                    regexPattern = `^(.*/)?(${regexPattern.slice(0, -1)})(/.*)?$`;
+                } else {
+                    regexPattern = `^(.*/)?(${regexPattern})$`;
+                }
+
+                const regex = new RegExp(regexPattern);
+                return regex.test(path);
+            }
+
+            // Add the refresh stats button click handler
+            $('.refresh-stats-button').on('click', function() {
+                updateOutputStatistics();
+                showToast("Statistics refreshed", 'info');
+            });
+            
+            // Add the updateOutputStatistics function
+            function updateOutputStatistics() {
+                // Get the content of files.txt
+                const filesContent = $('#files-output textarea').val();
+                
+                // Update selected files count
+                const selectedFilesCount = $('.file-checkbox:checked').length;
+                $('#selected-files-count').text(selectedFilesCount);
+                
+                // If there's content, calculate statistics
+                if (filesContent) {
+                    // Character count
+                    const charCount = filesContent.length;
+                    $('#char-count').text(charCount.toLocaleString());
+                    
+                    // Estimate token count (chars / 4)
+                    const tokenCount = Math.ceil(charCount / 4);
+                    $('#token-count').text(tokenCount.toLocaleString());
+                    
+                    // File size
+                    let sizeKB = charCount / 1024;
+                    let sizeDisplay;
+                    
+                    if (sizeKB < 1) {
+                        sizeDisplay = `${charCount} B`;
+                    } else if (sizeKB < 1024) {
+                        sizeDisplay = `${sizeKB.toFixed(2)} KB`;
+                    } else {
+                        sizeDisplay = `${(sizeKB / 1024).toFixed(2)} MB`;
+                    }
+                    
+                    $('#output-size').text(sizeDisplay);
+                } else {
+                    // No content, show dashes
+                    $('#char-count').text('-');
+                    $('#token-count').text('-');
+                    $('#output-size').text('-');
+                }
+            }
+
+            // Path history functionality
+            function initializePathHistory() {
+                // Load previously used paths from localStorage
+                let pathHistory = JSON.parse(localStorage.getItem('gitIngestPathHistory') || '[]');
+                const historyDropdown = $('#path-history-dropdown');
+                
+                // Initial render of history items
+                renderPathHistory();
+                
+                // Toggle dropdown when clicking history button
+                $('#show-history-button').on('click', function(e) {
+                    e.preventDefault();
+                    historyDropdown.toggle();
+                    e.stopPropagation();
+                });
+                
+                // Close dropdown when clicking outside
+                $(document).on('click', function(e) {
+                    if (!$(e.target).closest('#path-history-dropdown, #show-history-button').length) {
+                        historyDropdown.hide();
+                    }
+                });
+                
+                // Handle clicking on a path history item
+                $(document).on('click', '.dropdown-item', function(e) {
+                    if (!$(e.target).hasClass('remove-item') && !$(e.target).closest('.remove-item').length) {
+                        const path = $(this).data('path');
+                        $('#path-input').val(path);
+                        historyDropdown.hide();
+                        
+                        // Move this path to the top of history
+                        savePathToHistory(path);
+                    }
+                });
+                
+                // Handle removing individual items
+                $(document).on('click', '.remove-item', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const item = $(this).closest('.dropdown-item');
+                    const path = item.data('path');
+                    
+                    // Remove from history array
+                    pathHistory = pathHistory.filter(p => p !== path);
+                    
+                    // Save updated history
+                    localStorage.setItem('gitIngestPathHistory', JSON.stringify(pathHistory));
+                    
+                    // Remove from UI
+                    item.remove();
+                    
+                    // Show empty message if no items left
+                    if (pathHistory.length === 0) {
+                        $('#path-history-items').html('<div class="empty-history">No recent paths</div>');
+                    }
+                    
+                    // Show toast
+                    showToast(`Removed "${path}" from history`, 'info');
+                });
+                
+                // Handle clear all button
+                $('#clear-all-history').on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Clear history array
+                    pathHistory = [];
+                    
+                    // Save empty history
+                    localStorage.setItem('gitIngestPathHistory', JSON.stringify(pathHistory));
+                    
+                    // Update UI
+                    $('#path-history-items').html('<div class="empty-history">No recent paths</div>');
+                    
+                    // Show toast
+                    showToast('Path history cleared', 'info');
+                });
+                
+                // Save path to history when successfully loaded
+                $('#load-path-button').on('click', function() {
+                    const path = $('#path-input').val().trim();
+                    if (path) {
+                        savePathToHistory(path);
+                    }
+                });
+                
+                // Also save when pressing Enter in the input
+                $('#path-input').on('keypress', function(e) {
+                    if (e.which === 13) {
+                        const path = $(this).val().trim();
+                        if (path) {
+                            savePathToHistory(path);
+                        }
+                    }
+                });
+                
+                // Save path to history
+                function savePathToHistory(path) {
+                    if (!path) return;
+                    
+                    // Don't add duplicates, move to front if exists
+                    const existingIndex = pathHistory.indexOf(path);
+                    if (existingIndex !== -1) {
+                        pathHistory.splice(existingIndex, 1);
+                    }
+                    
+                    // Add new path to the beginning
+                    pathHistory.unshift(path);
+                    
+                    // Limit history size to 10 entries
+                    if (pathHistory.length > 10) {
+                        pathHistory = pathHistory.slice(0, 10);
+                    }
+                    
+                    // Save back to localStorage
+                    localStorage.setItem('gitIngestPathHistory', JSON.stringify(pathHistory));
+                    
+                    // Update dropdown
+                    renderPathHistory();
+                }
+                
+                // Render path history items
+                function renderPathHistory() {
+                    const historyItems = $('#path-history-items');
+                    historyItems.empty();
+                    
+                    if (pathHistory.length === 0) {
+                        historyItems.html('<div class="empty-history">No recent paths</div>');
+                        return;
+                    }
+                    
+                    pathHistory.forEach(path => {
+                        historyItems.append(`
+                            <div class="dropdown-item" data-path="${path}">
+                                <span class="path-text">${path}</span>
+                                <span class="remove-item" title="Remove from history">
+                                    <i class="fas fa-times"></i>
+                                </span>
+                            </div>
+                        `);
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

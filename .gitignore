@@ -1,0 +1,28 @@
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!app.py
+!README.md
+
+# Keep templates directory with index.html
+!templates/
+templates/*
+!templates/index.html
+
+# Keep static directory and its contents
+!static/
+!static/**/*
+
+# Always ignore these
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/ 
