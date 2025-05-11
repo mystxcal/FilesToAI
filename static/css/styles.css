@@ -708,6 +708,73 @@ label {
     align-items: center;
 }
 
+/* Info Section */
+.info-section {
+    background-color: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+}
+
+.info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    margin-bottom: 0; /* Remove margin if content is hidden */
+}
+
+.info-header h5 {
+    margin-bottom: 0;
+    font-weight: 400;
+    color: var(--highlight-color);
+}
+
+.info-header h5 i {
+    margin-right: 8px;
+}
+
+.toggle-info-button {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+.toggle-info-button i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.info-content {
+    padding-top: 10px;
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 10px;
+}
+
+.info-content h6 {
+    font-size: 0.9rem;
+    color: var(--highlight-color);
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+.info-content ol, .info-content ul {
+    padding-left: 20px;
+    margin-bottom: 10px;
+}
+
+.info-content li {
+    margin-bottom: 5px;
+}
+
+.info-content code {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
 /* Combined Actions Section */
 .combined-actions {
     margin-top: 5px;

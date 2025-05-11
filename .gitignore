@@ -5,6 +5,7 @@
 !.gitignore
 !app.py
 !README.md
+!global_hotkey_listener.py
 
 # Keep templates directory with index.html
 !templates/
@@ -25,4 +26,4 @@ __pycache__/
 .venv
 env/
 venv/
-ENV/ 
+ENV/

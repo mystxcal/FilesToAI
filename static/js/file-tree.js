@@ -27,6 +27,26 @@ function initializeFileTree() {
     $('#expand-all').on('click', expandAllFolders);
     
     $('#collapse-all').on('click', collapseAllFolders);
+
+    // Initialize info section toggle
+    initializeInfoSection();
+}
+
+function initializeInfoSection() {
+    $('.info-header').on('click', function() {
+        const content = $(this).siblings('.info-content');
+        const icon = $(this).find('.toggle-info-button i');
+
+        content.slideToggle(200, function() {
+            if (content.is(':visible')) {
+                icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+                $(this).closest('.info-header').css('margin-bottom', '10px'); // Add margin when open
+            } else {
+                icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+                $(this).closest('.info-header').css('margin-bottom', '0'); // Remove margin when closed
+            }
+        });
+    });
 }
 
 // Extension filter functionality

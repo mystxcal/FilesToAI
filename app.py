@@ -6,6 +6,10 @@ import logging
 from pathlib import Path
 import fnmatch
 import re
+import json
+import threading
+import atexit
+from global_hotkey_listener import setup_keyboard_listener, stop_keyboard_listener, logger as listener_logger # Import logger too
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = secrets.token_hex(16)
@@ -16,6 +20,25 @@ logger = logging.getLogger(__name__)
 
 logger.info(f"Current Working Directory: {os.getcwd()}")
 
+CONFIG_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'filestoai_config.json')
+
+def write_current_config_to_file():
+    """Writes the current relevant session settings to a JSON config file."""
+    config_data = {
+        'absolute_root': session.get('absolute_root'),
+        'respect_gitignore': session.get('respect_gitignore', True),
+        'respect_pathignore': session.get('respect_pathignore', True),
+        'pathignore_patterns': session.get('pathignore_patterns', []), # Parsed patterns
+        'pathignore_input_text': session.get('pathignore_input_text', ''), # Raw text for UI
+        'max_size_kb': session.get('max_size_kb', 250),
+        'last_selected_files': session.get('last_selected_files', []) # Add this
+    }
+    try:
+        with open(CONFIG_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, indent=4)
+        logger.info(f"Updated config file: {CONFIG_FILE_PATH} with data: {config_data}")
+    except Exception as e:
+        logger.error(f"Error writing config file {CONFIG_FILE_PATH}: {e}")
 
 def is_valid_path(base_path, check_path):
     """
@@ -268,7 +291,10 @@ def index():
             # Get optional ignore settings
             respect_gitignore = data.get('respect_gitignore', True)
             respect_pathignore = data.get('respect_pathignore', True)
-            pathignore_patterns = data.get('pathignore_patterns', [])
+            # Get raw pathignore text from JS and parse it
+            pathignore_input_text = data.get('pathignore_input_text', session.get('pathignore_input_text', '')) # Use session as fallback
+            parsed_pathignore_patterns = parse_ignore_patterns(pathignore_input_text) if respect_pathignore else []
+
 
             # Handle path from either navigation or initial input
             if 'path' in data:  # Navigation
@@ -292,13 +318,20 @@ def index():
             if not os.path.isdir(new_absolute_path):
                 return jsonify({'error': 'Path is not a directory'}), 400
 
-            session['absolute_root'] = new_absolute_path  # Update session
+            session['absolute_root'] = new_absolute_path
+            session['respect_gitignore'] = respect_gitignore
+            session['respect_pathignore'] = respect_pathignore
+            session['pathignore_patterns'] = parsed_pathignore_patterns # Store parsed list
+            session['pathignore_input_text'] = pathignore_input_text # Store raw text for UI
+            # max_size_kb is handled by generate_output or a dedicated settings update endpoint later
+            write_current_config_to_file() # Write to config
+
             file_tree_html = generate_file_tree(
                 new_absolute_path,
                 new_absolute_path,
                 respect_gitignore=respect_gitignore,
                 respect_pathignore=respect_pathignore,
-                pathignore_patterns=pathignore_patterns
+                pathignore_patterns=parsed_pathignore_patterns # Use parsed list for tree generation
             )
             return jsonify({'fileTree': file_tree_html})
         except Exception as e:
@@ -367,7 +400,10 @@ def generate_output():
     try:
         data = request.get_json()
         selected_files = data.get('selectedFiles', [])
-        max_size_kb = int(data.get('maxSizeKB', 250))
+        max_size_kb = int(data.get('maxSizeKB', session.get('max_size_kb', 250))) # Use session as fallback
+        session['max_size_kb'] = max_size_kb # Store/update in session
+        write_current_config_to_file() # Update config file
+
         absolute_root = session.get('absolute_root')
 
         if not selected_files:
@@ -532,9 +568,12 @@ def api_browse():
     - set_as_root: Whether to set this path as root for future operations (true/false)
     """
     path = request.args.get('path')
-    respect_gitignore = request.args.get('respect_gitignore', 'true').lower() == 'true'
-    respect_pathignore = request.args.get('respect_pathignore', 'false').lower() == 'true'
-    pathignore_patterns = request.args.get('pathignore_patterns', '').split(',') if request.args.get('pathignore_patterns') else []
+    respect_gitignore_arg = request.args.get('respect_gitignore', 'true').lower() == 'true'
+    respect_pathignore_arg = request.args.get('respect_pathignore', 'false').lower() == 'true'
+    # For /api/browse, pathignore_patterns is a comma-separated string from query params
+    pathignore_patterns_str = request.args.get('pathignore_patterns', '')
+    parsed_pathignore_patterns_for_browse = parse_ignore_patterns(pathignore_patterns_str.replace(',', '\n')) if respect_pathignore_arg else []
+
     show_hidden = request.args.get('show_hidden', 'false').lower() == 'true'
     set_as_root = request.args.get('set_as_root', 'true').lower() == 'true'
     
@@ -546,8 +585,18 @@ def api_browse():
     
     if set_as_root:
         session['absolute_root'] = path
+        session['respect_gitignore'] = respect_gitignore_arg
+        session['respect_pathignore'] = respect_pathignore_arg
+        # When setting root via API, we store the parsed patterns from the API call
+        # and also the raw string version for consistency if the UI expects it.
+        session['pathignore_patterns'] = parsed_pathignore_patterns_for_browse
+        session['pathignore_input_text'] = pathignore_patterns_str.replace(',', '\n')
+        # We assume max_size_kb is not changed by /api/browse, so we don't update it here.
+        # If it needs to be updatable via /api/browse, a new query param would be needed.
+        write_current_config_to_file()
     
-    file_tree_data = generate_file_tree_json(path, path, respect_gitignore, respect_pathignore, pathignore_patterns, show_hidden)
+    # Use the specific patterns for this browse request, not necessarily what's in session for pathignore
+    file_tree_data = generate_file_tree_json(path, path, respect_gitignore_arg, respect_pathignore_arg, parsed_pathignore_patterns_for_browse, show_hidden)
     return jsonify({
         'file_tree': file_tree_data,
         'root_path': path
@@ -906,5 +955,146 @@ def generate_output_content(selected_files, max_size_kb, absolute_root, include_
         }
     }
 
+@app.route('/api/global_trigger_generate_and_copy', methods=['POST'])
+def api_global_trigger_generate_and_copy():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid request data'}), 400
+
+        absolute_root = data.get('absolute_root')
+        respect_gitignore = data.get('respect_gitignore', True)
+        respect_pathignore = data.get('respect_pathignore', True)
+        pathignore_patterns = data.get('pathignore_patterns', []) # Expecting parsed patterns
+        max_size_kb = int(data.get('max_size_kb', 250))
+
+        if not absolute_root or not os.path.exists(absolute_root) or not os.path.isdir(absolute_root):
+            return jsonify({'error': 'Invalid or missing absolute_root path in request.'}), 400
+
+        # Logic to get all files in the root directory, respecting ignore rules
+        all_files_in_root = []
+        for dirpath, dirnames, filenames in os.walk(absolute_root):
+            # Filter directories to ignore
+            # For should_ignore_path, dirnames need to be absolute paths
+            abs_dirnames = [os.path.join(dirpath, dn) for dn in dirnames]
+            # Filter dirnames in place
+            dirnames[:] = [
+                dn for dn, abs_dn in zip(dirnames, abs_dirnames)
+                if not should_ignore_path(abs_dn, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns)
+            ]
+
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                if not should_ignore_path(file_path, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns):
+                    all_files_in_root.append(os.path.relpath(file_path, absolute_root).replace('\\', '/'))
+        
+        if not all_files_in_root:
+            return jsonify({'error': 'No files found in the specified root after applying ignore rules.'}), 400
+
+        # Generate content using the existing helper function
+        # Pass include_binary_files=False as a default, can be made configurable if needed
+        output_data = generate_output_content(all_files_in_root, max_size_kb, absolute_root, include_binary_files=False)
+
+        # Combine files.txt and project_map.txt for the clipboard
+        combined_content = "========== FILES ==========\n\n"
+        combined_content += output_data.get('files_txt', '')
+        combined_content += "\n\n========== PROJECT MAP ==========\n\n"
+        combined_content += output_data.get('project_map_txt', '')
+        # Get selected_files from the payload sent by the hotkey listener
+        selected_files_from_hotkey = data.get('selected_files', [])
+
+        if not selected_files_from_hotkey:
+            # Fallback or error if no files were selected according to the config
+            # For now, let's try to process all files if none are explicitly selected by hotkey config.
+            # This maintains previous behavior if last_selected_files isn't in config yet.
+            logger.warning("No 'selected_files' in hotkey payload, attempting to process all files in root.")
+            all_files_in_root = []
+            for dirpath, dirnames, filenames_in_dir in os.walk(absolute_root):
+                abs_dirnames = [os.path.join(dirpath, dn) for dn in dirnames]
+                dirnames[:] = [
+                    dn for dn, abs_dn in zip(dirnames, abs_dirnames)
+                    if not should_ignore_path(abs_dn, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns)
+                ]
+                for filename_in_dir in filenames_in_dir:
+                    file_path_local = os.path.join(dirpath, filename_in_dir)
+                    if not should_ignore_path(file_path_local, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns):
+                        all_files_in_root.append(os.path.relpath(file_path_local, absolute_root).replace('\\', '/'))
+            
+            if not all_files_in_root:
+                 return jsonify({'error': 'No files found in the specified root after applying ignore rules (fallback).'}), 400
+            selected_files_to_process = all_files_in_root
+        else:
+            selected_files_to_process = selected_files_from_hotkey
+            logger.info(f"Global trigger processing specific files: {selected_files_to_process}")
+
+
+        # Generate content using the existing helper function with the determined list of files
+        output_data = generate_output_content(selected_files_to_process, max_size_kb, absolute_root, include_binary_files=False)
+
+        # Combine files.txt and project_map.txt for the clipboard
+        combined_content = "========== FILES ==========\n\n"
+        combined_content += output_data.get('files_txt', '')
+        combined_content += "\n\n========== PROJECT MAP ==========\n\n"
+        combined_content += output_data.get('project_map_txt', '')
+        # Optionally add stats
+        stats = output_data.get('stats', {})
+        combined_content += "\n\n========== STATISTICS ==========\n\n"
+        combined_content += f"Total Files Processed: {stats.get('total_files', len(selected_files_to_process))}\n" # Use count of processed files
+        combined_content += f"Character Count: {stats.get('character_count', 0)}\n"
+        combined_content += f"Estimated Tokens: {stats.get('estimated_tokens', 0)}\n"
+        combined_content += f"Skipped Files (size): {stats.get('skipped_files', 0)}\n"
+        combined_content += f"Binary Files (content not included): {stats.get('binary_files', 0)}\n"
+
+
+        logger.info(f"Global trigger: Generated content for {len(selected_files_to_process)} files from {absolute_root}")
+        return jsonify({
+            'message': 'Content generated successfully for global trigger.',
+            'combined_content': combined_content,
+            'stats': output_data.get('stats')
+        })
+
+    except Exception as e:
+        logger.error(f"Error in /api/global_trigger_generate_and_copy: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': f'An internal error occurred: {str(e)}'}), 500
+
+@app.route('/api/update_current_selection', methods=['POST'])
+def api_update_current_selection():
+    try:
+        data = request.get_json()
+        selected_files = data.get('selectedFiles', [])
+        
+        # Store in session
+        session['last_selected_files'] = selected_files
+        
+        # Also write to the config file so the hotkey listener can pick it up
+        write_current_config_to_file()
+        
+        logger.info(f"Updated last_selected_files in session and config: {len(selected_files)} files.")
+        return jsonify({'message': f'Successfully updated current selection with {len(selected_files)} files.'}), 200
+    except Exception as e:
+        logger.error(f"Error in /api/update_current_selection: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': f'An internal error occurred: {str(e)}'}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5023)
+    # --- Start Keyboard Listener in a separate thread ---
+    # Check if Flask is being run by the reloader or directly
+    # We only want to start the listener thread in the main process, not the reloader's child process.
+    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+        listener_logger.info("Flask reloader active or not main process, listener thread will not be started by this instance.")
+    else:
+        listener_logger.info("Main Flask process detected. Starting keyboard listener thread.")
+        listener_thread = threading.Thread(target=setup_keyboard_listener, daemon=True)
+        listener_thread.start()
+        # Attempt to clean up hotkeys when the app exits
+        atexit.register(stop_keyboard_listener)
+        listener_logger.info("Keyboard listener thread started and atexit cleanup registered.")
+
+    # Run Flask app
+    # IMPORTANT: use_reloader=False is often recommended when managing background threads like this,
+    # as the reloader can cause the setup_keyboard_listener to run multiple times or in unexpected ways.
+    # However, for development, the reloader is very useful.
+    # If issues arise with duplicate hotkey registrations or thread problems, set use_reloader=False.
+    # For now, we'll rely on the WERKZEUG_RUN_MAIN check.
+    app.run(debug=True, port=5023) # Default use_reloader is True if debug is True
