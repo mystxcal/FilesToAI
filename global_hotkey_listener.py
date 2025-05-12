@@ -76,6 +76,12 @@ def trigger_generate_and_copy():
         # Optionally, provide user feedback here (e.g., system notification)
         return
 
+    # Check if global hotkey is enabled in config
+    enable_global_hotkey = config.get('enable_global_hotkey', True) # Default to True if not found
+    if not enable_global_hotkey:
+        logger.info("Global hotkey is disabled in the configuration. Aborting.")
+        return
+
     absolute_root = config.get('absolute_root')
     if not absolute_root:
         logger.error("Absolute root path not found in config. Aborting.")
@@ -150,15 +156,25 @@ def setup_keyboard_listener():
         logger.error(f"Failed to register TEST hotkey ({TEST_HOTKEY}): {e}.")
 
     # --- Main Hotkey Registration ---
-    try:
-        keyboard.add_hotkey(HOTKEY, trigger_generate_and_copy)
-        _registered_hotkeys.append(HOTKEY)
-        logger.info(f"Successfully registered MAIN hotkey: {HOTKEY}")
-    except Exception as e:
-        logger.error(f"CRITICAL: Failed to register MAIN hotkey ({HOTKEY}): {e}")
-        logger.error("The application's core hotkey functionality will NOT work.")
-        logger.error("Try running the main Flask app (app.py) with administrator/root privileges.")
-        return # Important to return if main hotkey fails
+    # Read config first to see if we should even register the hotkey
+    config_at_startup = read_config() # Read config at startup
+    enable_hotkey_at_startup = True # Default to true if config is missing or key is missing
+    if config_at_startup:
+        enable_hotkey_at_startup = config_at_startup.get('enable_global_hotkey', True)
+
+    if enable_hotkey_at_startup:
+        try:
+            keyboard.add_hotkey(HOTKEY, trigger_generate_and_copy)
+            _registered_hotkeys.append(HOTKEY)
+            logger.info(f"Successfully registered MAIN hotkey: {HOTKEY} (enabled at startup)")
+        except Exception as e:
+            logger.error(f"CRITICAL: Failed to register MAIN hotkey ({HOTKEY}): {e}")
+            logger.error("The application's core hotkey functionality will NOT work.")
+            logger.error("Try running the main Flask app (app.py) with administrator/root privileges.")
+            # No return here, as the app might still run without the hotkey if other parts are fine.
+    else:
+        logger.info(f"MAIN hotkey ({HOTKEY}) was NOT registered because 'enable_global_hotkey' is false in config at startup.")
+
 
     # Check if config file exists at start, create a default one if not
     # This logic is good to keep, as app.py might be run for the first time
@@ -172,7 +188,8 @@ def setup_keyboard_listener():
             'pathignore_patterns': ["node_modules/", "*.log", ".DS_Store", "__pycache__/"], # Default parsed
             'pathignore_input_text': "node_modules/\n*.log\n.DS_Store\n__pycache__/", # Default raw text
             'max_size_kb': 250,
-            'last_selected_files': [] # Default empty list
+            'last_selected_files': [], # Default empty list
+            'enable_global_hotkey': True # Default to enabled
         }
         try:
             with open(CONFIG_FILE_PATH, 'w', encoding='utf-8') as f:

@@ -83,6 +83,16 @@ __pycache__/</textarea>
                         </div>
                     </div>
 
+                    <!-- Global Hotkey Toggle -->
+                    <div class="form-group">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="global-hotkey-toggle" {{ 'checked'
+                                if enable_global_hotkey else '' }}>
+                            <label class="custom-control-label" for="global-hotkey-toggle">Enable Global Hotkey
+                                (Ctrl+Shift+Space)</label>
+                        </div>
+                    </div>
+
                     <!-- Size Slider -->
                     <div id="size-slider-container" class="form-group">
                         <label for="size-slider">Maximum File Size:</label>
@@ -325,14 +335,16 @@ __pycache__/</textarea>
                             <li><strong>Configure Settings (Optional):</strong>
                                 <ul>
                                     <li>Use the toggles to respect <code>.gitignore</code> files or enable custom
-                                        <code>pathignore</code> patterns.</li>
+                                        <code>pathignore</code> patterns.
+                                    </li>
                                     <li>Adjust the "Maximum File Size" slider to control the size of individual files
                                         included in the output. Files larger than this limit will have their content
                                         replaced with a notice.</li>
                                     <li>Use "Quick Select by Extensions" to add common file types to a selection list,
                                         then click "Select Files with These Extensions".</li>
                                     <li>Use "Ignore by Extensions" to hide and unselect files of specific types (e.g.,
-                                        <code>.min.js</code>, <code>.log</code>).</li>
+                                        <code>.min.js</code>, <code>.log</code>).
+                                    </li>
                                 </ul>
                             </li>
                             <li><strong>Select Files/Folders:</strong>
@@ -455,6 +467,9 @@ __pycache__/</textarea>
 
             // Initialize path history feature
             initializePathHistory();
+
+            // Initialize Global Hotkey Toggle
+            initializeGlobalHotkeyToggle();
 
             // --- Load initial path ---
             $('#load-path-button').on('click', function () {
@@ -1349,6 +1364,39 @@ Selected Files: ${selectedFilesCount}`;
                 // A slight delay might be good to ensure the DOM is updated.
                 setTimeout(sendCurrentSelectionToServer, 100);
             });
+
+            // --- Global Hotkey Toggle ---
+            function initializeGlobalHotkeyToggle() {
+                // Initial state is set by Flask template rendering.
+                // Add change listener to send updates to the server.
+                $('#global-hotkey-toggle').on('change', function () {
+                    const isEnabled = $(this).is(':checked');
+                    showLoading(true);
+                    $.ajax({
+                        url: '/api/settings/global_hotkey',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ enabled: isEnabled }),
+                        success: function (response) {
+                            if (response.success) {
+                                showToast(`Global hotkey ${isEnabled ? 'enabled' : 'disabled'}. Restart app for changes to take effect if listener is already running.`, 'success');
+                            } else {
+                                showToast(response.error || 'Error updating hotkey setting.', 'error');
+                                // Revert checkbox if server update failed
+                                $('#global-hotkey-toggle').prop('checked', !isEnabled);
+                            }
+                        },
+                        error: function () {
+                            showToast('Failed to update global hotkey setting.', 'error');
+                            // Revert checkbox on AJAX error
+                            $('#global-hotkey-toggle').prop('checked', !isEnabled);
+                        },
+                        complete: function () {
+                            showLoading(false);
+                        }
+                    });
+                });
+            }
 
 
         });

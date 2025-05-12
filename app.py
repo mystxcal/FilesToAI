@@ -31,7 +31,8 @@ def write_current_config_to_file():
         'pathignore_patterns': session.get('pathignore_patterns', []), # Parsed patterns
         'pathignore_input_text': session.get('pathignore_input_text', ''), # Raw text for UI
         'max_size_kb': session.get('max_size_kb', 250),
-        'last_selected_files': session.get('last_selected_files', []) # Add this
+        'last_selected_files': session.get('last_selected_files', []),
+        'enable_global_hotkey': session.get('enable_global_hotkey', True) # Add this
     }
     try:
         with open(CONFIG_FILE_PATH, 'w', encoding='utf-8') as f:
@@ -281,6 +282,8 @@ def format_size(size_bytes):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     absolute_root = session.get('absolute_root')
+    # Ensure enable_global_hotkey is in session, default to True if not found
+    enable_global_hotkey = session.get('enable_global_hotkey', True)
 
     if request.method == 'POST':
         try:
@@ -346,7 +349,25 @@ def index():
             # Initial load: no root set, show empty tree
             file_tree_html = "<ul><li class='empty-prompt'>Enter a directory path above to begin.</li></ul>"
 
-        return render_template('index.html', file_tree_html=file_tree_html)
+        return render_template('index.html', file_tree_html=file_tree_html, enable_global_hotkey=enable_global_hotkey)
+
+@app.route('/api/settings/global_hotkey', methods=['POST'])
+def api_settings_global_hotkey():
+    try:
+        data = request.get_json()
+        if data is None or 'enabled' not in data:
+            return jsonify({'success': False, 'error': 'Invalid request data. "enabled" field missing.'}), 400
+
+        is_enabled = bool(data['enabled'])
+        session['enable_global_hotkey'] = is_enabled
+        write_current_config_to_file() # This will now include the new setting
+
+        logger.info(f"Global hotkey setting updated to: {'Enabled' if is_enabled else 'Disabled'}")
+        return jsonify({'success': True, 'message': f'Global hotkey has been {"enabled" if is_enabled else "disabled"}. Restart app for changes to take effect.'})
+    except Exception as e:
+        logger.error(f"Error updating global hotkey setting: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': f'An internal error occurred: {str(e)}'}), 500
 
 @app.route('/get_file_content', methods=['POST'])
 def get_file_content():
