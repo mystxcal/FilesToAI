@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "filestoai"
+version = "1.0.0"
+description = "Export your codebase for AI consumption - CLI and Web Interface"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+keywords = ["ai", "codebase", "export", "cli", "llm", "chatgpt", "claude"]
+authors = [
+    {name = "mystxcal"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "Flask>=2.3.0",
+    "keyboard>=0.13.5",
+    "pyperclip>=1.8.2",
+    "requests>=2.31.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mystxcal/FilesToAI"
+Repository = "https://github.com/mystxcal/FilesToAI"
+"Bug Tracker" = "https://github.com/mystxcal/FilesToAI/issues"
+
+[project.scripts]
+filestoai = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli", "core", "app", "global_hotkey_listener"]
+

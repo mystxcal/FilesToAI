@@ -5,11 +5,21 @@ import traceback
 import logging
 from pathlib import Path
 import fnmatch
-import re
+
 import json
 import threading
 import atexit
 from global_hotkey_listener import setup_keyboard_listener, stop_keyboard_listener, logger as listener_logger # Import logger too
+from core import (
+    format_size,
+    gitignore_pattern_to_regex,
+    parse_ignore_file,
+    parse_ignore_patterns,
+    should_ignore_path,
+    collect_files,
+    generate_output_content,
+    create_project_map
+)
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = secrets.token_hex(16)
@@ -21,6 +31,17 @@ logger = logging.getLogger(__name__)
 logger.info(f"Current Working Directory: {os.getcwd()}")
 
 CONFIG_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'filestoai_config.json')
+
+# Favicon route to serve the app icon
+@app.route('/favicon.ico')
+def favicon():
+    try:
+        assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
+        return send_from_directory(assets_dir, 'image.png', mimetype='image/png')
+    except Exception as e:
+        logger.error(f"Error serving favicon: {e}")
+        # Fallback empty response to avoid noisy 404s in logs
+        return ('', 204)
 
 def write_current_config_to_file():
     """Writes the current relevant session settings to a JSON config file."""
@@ -52,152 +73,6 @@ def is_valid_path(base_path, check_path):
         logger.error(f"Path validation error: {e}")
         return False
 
-def gitignore_pattern_to_regex(pattern):
-    """Converts a gitignore pattern to a regular expression."""
-
-    # Handle trailing slashes (directories)
-    is_dir_pattern = False
-    if pattern.endswith('\\/'):  # Check for escaped slash
-        pattern = pattern[:-2] + '/' # Remove the escaping
-    elif pattern.endswith('/'):
-        is_dir_pattern = True
-        pattern = pattern[:-1]
-
-    # Handle **
-    pattern = pattern.replace('\\*\\*', '{starstar}')  # Temporary placeholder
-    pattern = pattern.replace('**', '.*') # zero or more directories
-    pattern = pattern.replace('{starstar}', '(?:.*/)?') # Match zero or more directories
-
-    # Handle * and ? BEFORE escaping
-    pattern = pattern.replace('\\?', '.')  # Match any single character (except /)
-    pattern = pattern.replace('\\*', '[^/]*')  # Match anything except /
-    
-    # NEW: Handle character class [] BEFORE escaping
-    parts = []
-    in_class = False
-    for i, char in enumerate(pattern):
-        if char == '[':
-            in_class = True
-            parts.append(char)
-        elif char == ']':
-            in_class = False
-            parts.append(char)
-        elif in_class and char == '-':  # Only escape - inside [] if between chars
-            # Check if '-' is at the start/end or next to another special char
-            if i > 0 and pattern[i-1] != '[' and i < len(pattern) -1 and pattern[i+1] != ']':
-              parts.append('\\-') # Escape it
-            else:
-              parts.append(char) # Don't escape
-        else:
-            parts.append(char)
-
-    pattern = "".join(parts)
-
-    # Escape special regex characters NOW, after [], *, and ?
-    pattern = re.escape(pattern)
-
-    # Unescape characters we handled earlier
-    pattern = pattern.replace('\\.', '.') # Restore .
-    pattern = pattern.replace('\\[', '[')  # Restore [
-    pattern = pattern.replace('\\]', ']')  # Restore ]
-    
-    # Handle leading slash 
-    if pattern.startswith('/'): 
-        pattern = '^' + pattern[1:]  # Match from beginning of path, remove leading slash
-    elif pattern.startswith('\\/'): # check for escaped slash second (less common)
-        pattern = '^' + pattern[2:]  # Match from beginning of path, remove escaped slash
-    else: # No leading slash
-        pattern = '^(?:.*/)?' + pattern  # Match anywhere in the path
-
-
-    if is_dir_pattern:
-            pattern += '(?:/.*)?$' # Must be followed by / or end of string.
-    else:
-        pattern += '$'
-
-    return pattern
-
-def parse_ignore_file(ignore_file_path):
-    """Parse .gitignore or .pathignore file and return patterns"""
-    patterns = []
-    if not os.path.exists(ignore_file_path):
-        return patterns
-
-    try:
-        with open(ignore_file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'): # Skip empty lines/comments
-                    patterns.append(line)
-    except Exception as e:
-        logger.error(f"Error parsing ignore file {ignore_file_path}: {e}")
-
-    return patterns
-
-def parse_ignore_patterns(patterns_text):
-    """Parse ignore patterns from a string (each pattern on a new line)"""
-    patterns = []
-    if not patterns_text:
-        return patterns
-
-    for line in patterns_text.splitlines():
-        line = line.strip()
-        if line and not line.startswith('#'):
-            patterns.append(line)
-    return patterns
-
-
-def should_ignore_path(path, root_path, respect_gitignore=True, respect_pathignore=True, pathignore_patterns=None, debug=False):
-    """
-    Check if a path should be ignored based on ignore patterns.
-    """
-    rel_path = os.path.relpath(path, root_path).replace('\\', '/')
-    is_dir = os.path.isdir(path)
-
-    if debug:
-        logger.debug(f"Checking ignore status for: {rel_path} (is_dir={is_dir})")
-
-    ignored = False  # Default: not ignored
-    patterns = []
-
-    # Gather patterns from .gitignore, if enabled
-    if respect_gitignore:
-        gitignore_path = os.path.join(root_path, '.gitignore')
-        patterns.extend(parse_ignore_file(gitignore_path))
-
-    # Add custom pathignore patterns, if enabled
-    if respect_pathignore and pathignore_patterns:
-        patterns.extend(pathignore_patterns)
-
-    if not patterns:
-        if debug: logger.debug("No ignore patterns to check.")
-        return False
-
-    for pattern in patterns:
-        # Handle negation
-        negate = False
-        if pattern.startswith('!'):
-            negate = True
-            pattern = pattern[1:]
-
-        regex_pattern = gitignore_pattern_to_regex(pattern)
-        if debug: logger.debug(f"  Testing pattern: {pattern}  (regex: {regex_pattern})")
-
-        match = re.search(regex_pattern, rel_path)
-
-        if match:
-            if debug: logger.debug(f"    Matched! Negate: {negate}")
-            if negate:
-                ignored = False  # Un-ignore
-            else:
-                # Directory check ONLY if it is a dir pattern.
-                if pattern.endswith('/') and not is_dir:
-                  continue # Skip.
-                ignored = True  # Ignore
-
-    if debug: logger.debug(f"Final ignore status for {rel_path}: {ignored}")
-    return ignored
-
 
 def generate_file_tree(root_path, current_path, respect_gitignore=True, respect_pathignore=True, pathignore_patterns=None):
     """Generates HTML: folders first, checkboxes, subfolders initially hidden."""
@@ -215,7 +90,8 @@ def generate_file_tree(root_path, current_path, respect_gitignore=True, respect_
             filtered_items = []
             for item in items:
                 item_path = os.path.join(current_path, item)
-                if not should_ignore_path(item_path, root_path, respect_gitignore, respect_pathignore, pathignore_patterns):
+                # Adjust should_ignore_path call to match new signature in core
+                if not should_ignore_path(item_path, root_path, respect_gitignore, pathignore_patterns):
                     filtered_items.append(item)
 
             items = filtered_items
@@ -269,15 +145,6 @@ def generate_file_tree(root_path, current_path, respect_gitignore=True, respect_
 
     html += '</ul>'  # Close top-level ul
     return html
-
-def format_size(size_bytes):
-    """Convert size in bytes to human-readable format"""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -433,146 +300,20 @@ def generate_output():
         if absolute_root is None:
             return jsonify({'error': "Root path not set."}), 400
 
-        max_size_bytes = max_size_kb * 1024
-        files_txt_content = ""
-        skipped_files = []
-        binary_files = []
-
-        for relative_file_path in selected_files:
-            # Normalize path
-            relative_file_path = relative_file_path.replace('\\', '/')
-            absolute_file_path = os.path.join(absolute_root, relative_file_path)
-
-            # Security check
-            if not is_valid_path(absolute_root, absolute_file_path):
-                continue
-
-            logger.info(f"Processing file: {absolute_file_path}")
-
-            try:
-                file_size = os.path.getsize(absolute_file_path)
-                if file_size > max_size_bytes:
-                    files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-                    files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-                    files_txt_content += f"(File size {format_size(file_size)} exceeds limit of {max_size_kb} KB)\n"
-                    files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-                    skipped_files.append(relative_file_path)
-                    continue
-
-                # Try different encodings
-                content = None
-                for encoding in ['utf-8', 'latin-1', 'cp1252']:
-                    try:
-                        with open(absolute_file_path, "r", encoding=encoding) as infile:
-                            content = infile.read()
-                        break
-                    except UnicodeDecodeError:
-                        continue
-
-                if content is None:
-                    files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-                    files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-                    files_txt_content += "(Binary or non-text file - content not included)\n"
-                    files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-                    binary_files.append(relative_file_path)
-                else:
-                    files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-                    files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-                    files_txt_content += content
-                    files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-
-            except Exception as e:
-                logger.error(f"Error processing file {relative_file_path}: {e}")
-                files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-                files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-                files_txt_content += f"Error reading file: {e}\n"
-                files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-
-        project_map_txt_content = create_project_map(selected_files, absolute_root)
+        # Use core function for generating output
+        result = generate_output_content(selected_files, absolute_root, max_size_kb, include_binary=True)
 
         return jsonify({
             'message': 'Output generated successfully!',
-            'files_txt': files_txt_content,
-            'project_map_txt': project_map_txt_content,
-            'skipped_files': len(skipped_files),
-            'binary_files': len(binary_files)
+            'files_txt': result['files_txt'],
+            'project_map_txt': result['project_map_txt'],
+            'skipped_files': result['stats']['skipped_files'],
+            'binary_files': result['stats']['binary_files']
         })
     except Exception as e:
         logger.error(f"Error generating output: {e}")
         return jsonify({'error': str(e)}), 500
 
-def create_project_map(file_paths, absolute_root):
-    """Creates a project map."""
-    root = {}
-    try:
-        for relative_file_path in file_paths:
-            # Normalize path
-            relative_file_path = relative_file_path.replace('\\', '/')
-            parts = relative_file_path.split('/')
-
-            current_level = root
-            for part in parts[:-1]:
-                if part not in current_level:
-                    current_level[part] = {}
-                current_level = current_level[part]
-            current_level[parts[-1]] = None
-    except Exception as e:
-        logger.error(f"Error creating project map: {e}")
-        return "Error generating project map."
-
-    def dict_to_map_string(d, prefix=""):
-        map_str = ""
-        
-        # Process directories first (with values that are dicts)
-        dirs = {k: v for k, v in d.items() if isinstance(v, dict)}
-        files = [k for k, v in d.items() if v is None]
-        
-        # Sort directories and files
-        sorted_dirs = sorted(dirs.items())
-        sorted_files = sorted(files)
-        
-        # Total items = dirs + files
-        total_items = len(sorted_dirs) + len(sorted_files)
-        
-        # Track the current item for proper tree lines
-        current_item = 0
-        
-        # Process directories
-        for key, value in sorted_dirs:
-            current_item += 1
-            is_last = current_item == total_items
-            
-            # Use proper branch characters based on position
-            if is_last:
-                branch = "└── "
-                child_prefix = prefix + "    "  # 4 spaces for alignment
-            else:
-                branch = "├── "
-                child_prefix = prefix + "│   "  # Vertical line for children
-            
-            # Add directory with trailing slash
-            map_str += f"{prefix}{branch}{key}/\n"
-            
-            # Process children with updated prefix
-            map_str += dict_to_map_string(value, child_prefix)
-            
-        # Process files
-        for i, key in enumerate(sorted_files):
-            current_item += 1
-            is_last = current_item == total_items
-            
-            # Use proper branch characters based on position
-            if is_last:
-                branch = "└── "
-            else:
-                branch = "├── "
-                
-            map_str += f"{prefix}{branch}{key}\n"
-            
-        return map_str
-
-    project_map = "Directory structure:\n" + dict_to_map_string(root)
-    return project_map
 
 # API endpoints
 @app.route('/api/browse', methods=['GET'])
@@ -863,7 +604,9 @@ def generate_file_tree_json(root_path, current_path, respect_gitignore=True, res
             if not show_hidden and item.startswith('.') and item not in ['.gitignore', '.pathignore']:
                 continue
                 
-            if not should_ignore_path(item_path, root_path, respect_gitignore, respect_pathignore, pathignore_patterns):
+            # Merge respect_pathignore into custom_patterns for core function
+            combined_patterns = pathignore_patterns if respect_pathignore and pathignore_patterns else None
+            if not should_ignore_path(item_path, root_path, respect_gitignore, combined_patterns):
                 filtered_items.append(item)
         
         items = filtered_items
@@ -906,75 +649,6 @@ def generate_file_tree_json(root_path, current_path, respect_gitignore=True, res
         
     return result
 
-def generate_output_content(selected_files, max_size_kb, absolute_root, include_binary_files=False):
-    """Generate output content for files.txt and project_map.txt"""
-    max_size_bytes = max_size_kb * 1024
-    files_txt_content = ""
-    skipped_files = []
-    binary_files = []
-    
-    for relative_file_path in selected_files:
-        # Normalize path
-        relative_file_path = relative_file_path.replace('\\', '/')
-        absolute_file_path = os.path.join(absolute_root, relative_file_path)
-        
-        try:
-            file_size = os.path.getsize(absolute_file_path)
-            if file_size > max_size_bytes:
-                files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-                files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-                files_txt_content += f"(File size {format_size(file_size)} exceeds limit of {max_size_kb} KB)\n"
-                files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-                skipped_files.append(relative_file_path)
-                continue
-                
-            # Try different encodings
-            content = None
-            for encoding in ['utf-8', 'latin-1', 'cp1252']:
-                try:
-                    with open(absolute_file_path, "r", encoding=encoding) as infile:
-                        content = infile.read()
-                    break
-                except UnicodeDecodeError:
-                    continue
-                    
-            if content is None:
-                binary_files.append(relative_file_path)
-                if include_binary_files:
-                    files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-                    files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-                    files_txt_content += "(Binary or non-text file - content not included)\n"
-                    files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-            else:
-                files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-                files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-                files_txt_content += content
-                files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-                
-        except Exception as e:
-            logger.error(f"Error processing file {relative_file_path}: {e}")
-            files_txt_content += f"=== File: {os.path.basename(relative_file_path)} ===\n"
-            files_txt_content += f"=== Path: {relative_file_path} ===\n\n"
-            files_txt_content += f"Error reading file: {e}\n"
-            files_txt_content += "\n\n" + "=" * 40 + "\n\n"
-            
-    project_map_txt_content = create_project_map(selected_files, absolute_root)
-    
-    # Calculate statistics
-    char_count = len(files_txt_content)
-    token_estimate = char_count // 4  # Rough estimate of tokens
-    
-    return {
-        'files_txt': files_txt_content,
-        'project_map_txt': project_map_txt_content,
-        'stats': {
-            'character_count': char_count,
-            'estimated_tokens': token_estimate,
-            'skipped_files': len(skipped_files),
-            'binary_files': len(binary_files),
-            'total_files': len(selected_files)
-        }
-    }
 
 @app.route('/api/global_trigger_generate_and_copy', methods=['POST'])
 def api_global_trigger_generate_and_copy():
@@ -992,29 +666,16 @@ def api_global_trigger_generate_and_copy():
         if not absolute_root or not os.path.exists(absolute_root) or not os.path.isdir(absolute_root):
             return jsonify({'error': 'Invalid or missing absolute_root path in request.'}), 400
 
-        # Logic to get all files in the root directory, respecting ignore rules
-        all_files_in_root = []
-        for dirpath, dirnames, filenames in os.walk(absolute_root):
-            # Filter directories to ignore
-            # For should_ignore_path, dirnames need to be absolute paths
-            abs_dirnames = [os.path.join(dirpath, dn) for dn in dirnames]
-            # Filter dirnames in place
-            dirnames[:] = [
-                dn for dn, abs_dn in zip(dirnames, abs_dirnames)
-                if not should_ignore_path(abs_dn, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns)
-            ]
-
-            for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
-                if not should_ignore_path(file_path, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns):
-                    all_files_in_root.append(os.path.relpath(file_path, absolute_root).replace('\\', '/'))
+        # Use the core function to collect files
+        combined_patterns = pathignore_patterns if respect_pathignore and pathignore_patterns else None
+        all_files_in_root = collect_files(absolute_root, respect_gitignore, combined_patterns)
         
         if not all_files_in_root:
             return jsonify({'error': 'No files found in the specified root after applying ignore rules.'}), 400
 
-        # Generate content using the existing helper function
-        # Pass include_binary_files=False as a default, can be made configurable if needed
-        output_data = generate_output_content(all_files_in_root, max_size_kb, absolute_root, include_binary_files=False)
+        # Generate content using the core helper function
+        # Pass include_binary=False as a default, can be made configurable if needed
+        output_data = generate_output_content(all_files_in_root, absolute_root, max_size_kb, include_binary=False)
 
         # Combine files.txt and project_map.txt for the clipboard
         combined_content = "========== FILES ==========\n\n"
@@ -1029,17 +690,8 @@ def api_global_trigger_generate_and_copy():
             # For now, let's try to process all files if none are explicitly selected by hotkey config.
             # This maintains previous behavior if last_selected_files isn't in config yet.
             logger.warning("No 'selected_files' in hotkey payload, attempting to process all files in root.")
-            all_files_in_root = []
-            for dirpath, dirnames, filenames_in_dir in os.walk(absolute_root):
-                abs_dirnames = [os.path.join(dirpath, dn) for dn in dirnames]
-                dirnames[:] = [
-                    dn for dn, abs_dn in zip(dirnames, abs_dirnames)
-                    if not should_ignore_path(abs_dn, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns)
-                ]
-                for filename_in_dir in filenames_in_dir:
-                    file_path_local = os.path.join(dirpath, filename_in_dir)
-                    if not should_ignore_path(file_path_local, absolute_root, respect_gitignore, respect_pathignore, pathignore_patterns):
-                        all_files_in_root.append(os.path.relpath(file_path_local, absolute_root).replace('\\', '/'))
+            combined_patterns = pathignore_patterns if respect_pathignore and pathignore_patterns else None
+            all_files_in_root = collect_files(absolute_root, respect_gitignore, combined_patterns)
             
             if not all_files_in_root:
                  return jsonify({'error': 'No files found in the specified root after applying ignore rules (fallback).'}), 400
@@ -1049,8 +701,8 @@ def api_global_trigger_generate_and_copy():
             logger.info(f"Global trigger processing specific files: {selected_files_to_process}")
 
 
-        # Generate content using the existing helper function with the determined list of files
-        output_data = generate_output_content(selected_files_to_process, max_size_kb, absolute_root, include_binary_files=False)
+        # Generate content using the core helper function with the determined list of files
+        output_data = generate_output_content(selected_files_to_process, absolute_root, max_size_kb, include_binary=False)
 
         # Combine files.txt and project_map.txt for the clipboard
         combined_content = "========== FILES ==========\n\n"
