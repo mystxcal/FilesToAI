@@ -19,14 +19,20 @@ pip install -e .
 filestoai .                      # Export current directory
 filestoai /path/to/project -gi   # With gitignore
 filestoai . --size 200           # Custom size limit (200 KB)
+filestoai --server               # Start web interface
 ```
 
 ### Option 2: Web Interface
 ```bash
 git clone https://github.com/mystxcal/FilesToAI
 cd FilesToAI
+pip install -e .
+
+# Start server (choose one):
+filestoai --server        # Via CLI
+# OR
 pip install -r requirements.txt
-python app.py
+python app.py             # Direct method
 ```
 
 **→** Open `http://127.0.0.1:5023`
@@ -89,11 +95,22 @@ filestoai . --list-files                # Preview files
 
 # Combined
 filestoai . -gi --size 150 -i "dist/,*.min.js" -v
+
+# Start web interface
+filestoai --server               # Default port 5023
+filestoai --server --port 8000   # Custom port
 ```
 
 See [CLI_USAGE.md](CLI_USAGE.md) for all CLI options and examples.
 
 ### Web Interface
+
+**Start the server:**
+```bash
+filestoai --server   # Via CLI (recommended)
+# OR
+python app.py        # Direct method
+```
 
 | Step | Action |
 |------|--------|

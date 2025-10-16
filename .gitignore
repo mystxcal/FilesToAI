@@ -49,3 +49,9 @@ global_hotkey_listener.log.*
 # Environment
 .env
 .env.local
+
+# Publishing (keep local only)
+PUBLISHING.md
+publish.ps1
+publish.sh
+publish.bat

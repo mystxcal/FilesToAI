@@ -35,6 +35,8 @@ Examples:
   filestoai . -o output.txt            # Save to file instead of clipboard
   filestoai . --no-copy                # Don't copy to clipboard
   filestoai . --project-map-only       # Only generate project map
+  filestoai --server                   # Start web interface
+  filestoai --server --port 8000       # Start web interface on custom port
         """
     )
     
@@ -112,11 +114,47 @@ Examples:
         help='List files that would be processed and exit'
     )
     
+    parser.add_argument(
+        '--server',
+        action='store_true',
+        help='Start the web interface server (Flask app)'
+    )
+    
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=5023,
+        metavar='PORT',
+        help='Port for web server (default: 5023, only works with --server)'
+    )
+    
     args = parser.parse_args()
     
     # Set logging level
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Handle --server mode
+    if args.server:
+        logger.info(f"Starting FilesToAI web server on port {args.port}...")
+        logger.info(f"Open your browser to: http://127.0.0.1:{args.port}")
+        
+        try:
+            # Import Flask app
+            from app import app as flask_app
+            
+            # Run the server
+            flask_app.run(debug=True, port=args.port)
+        except ImportError as e:
+            logger.error(f"Error: Could not import Flask app. Make sure all dependencies are installed.")
+            logger.error(f"Run: pip install -r requirements.txt")
+            sys.exit(1)
+        except Exception as e:
+            logger.error(f"Error starting server: {e}")
+            sys.exit(1)
+        
+        # Server mode exits here
+        return
     
     # Resolve directory path
     directory = os.path.abspath(args.directory)

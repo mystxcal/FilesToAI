@@ -108,6 +108,19 @@ filestoai . -v
 filestoai . --verbose -gi
 ```
 
+#### `--server`
+Start the web interface server (Flask app)
+```bash
+filestoai --server               # Start on default port 5023
+filestoai --server --port 8000   # Start on custom port
+```
+
+#### `--port PORT`
+Specify port for web server (only works with `--server`)
+```bash
+filestoai --server --port 8080
+```
+
 ## Examples
 
 ### Export a React project ignoring node_modules and build files
@@ -138,6 +151,17 @@ filestoai . -gi --list-files
 ### Export with verbose logging
 ```bash
 filestoai . -gi -v
+```
+
+### Start the web interface
+```bash
+# Default port (5023)
+filestoai --server
+
+# Custom port
+filestoai --server --port 8000
+
+# Then open browser to http://127.0.0.1:5023 (or your custom port)
 ```
 
 ### Complex example: Export a large project with custom settings
@@ -189,6 +213,10 @@ The CLI tool shares the same core functionality with the web interface. You can 
 
 ### Start the web interface:
 ```bash
+# Via CLI (recommended)
+filestoai --server
+
+# Or run directly
 python app.py
 ```
 
@@ -197,6 +225,15 @@ Then open `http://127.0.0.1:5023` in your browser.
 ### Use CLI for quick exports:
 ```bash
 filestoai . -gi
+```
+
+### Switch between modes:
+```bash
+# CLI mode for quick exports
+filestoai . -gi -o output.txt
+
+# Web mode when you need the GUI
+filestoai --server
 ```
 
 ## Tips
