@@ -9,7 +9,7 @@
 ## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/yourusername/FilesToAI
+git clone https://github.com/mystxcal/FilesToAI
 cd FilesToAI
 pip install -r requirements.txt
 python app.py
