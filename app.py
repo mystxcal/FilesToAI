@@ -30,7 +30,7 @@ def write_current_config_to_file():
         'respect_pathignore': session.get('respect_pathignore', True),
         'pathignore_patterns': session.get('pathignore_patterns', []), # Parsed patterns
         'pathignore_input_text': session.get('pathignore_input_text', ''), # Raw text for UI
-        'max_size_kb': session.get('max_size_kb', 250),
+        'max_size_kb': session.get('max_size_kb', 100),
         'last_selected_files': session.get('last_selected_files', []),
         'enable_global_hotkey': session.get('enable_global_hotkey', True) # Add this
     }
@@ -421,7 +421,7 @@ def generate_output():
     try:
         data = request.get_json()
         selected_files = data.get('selectedFiles', [])
-        max_size_kb = int(data.get('maxSizeKB', session.get('max_size_kb', 250))) # Use session as fallback
+        max_size_kb = int(data.get('maxSizeKB', session.get('max_size_kb', 100))) # Use session as fallback
         session['max_size_kb'] = max_size_kb # Store/update in session
         write_current_config_to_file() # Update config file
 
@@ -632,7 +632,7 @@ def api_select():
     {
         "extension_filters": [".js", ".py"],     // Extensions to include
         "path_patterns": ["src/*"],              // Glob patterns
-        "max_size_kb": 250,                      // Size limit
+        "max_size_kb": 100,                      // Size limit
         "exclude_extensions": [".min.js"],       // Extensions to exclude
         "select_all": false,                     // Whether to select all files first
         "in_directory": "src"                    // Optional: only look in this subdirectory
@@ -644,7 +644,7 @@ def api_select():
         
     extension_filters = data.get('extension_filters', [])
     path_patterns = data.get('path_patterns', [])
-    max_size_kb = data.get('max_size_kb', 250)
+    max_size_kb = data.get('max_size_kb', 100)
     exclude_extensions = data.get('exclude_extensions', [])
     select_all = data.get('select_all', False)
     in_directory = data.get('in_directory', '')
@@ -715,7 +715,7 @@ def api_generate():
     Request body:
     {
         "selected_files": ["path/to/file1.js", "path/to/file2.py"],
-        "max_size_kb": 250,
+        "max_size_kb": 100,
         "include_project_map": true,
         "include_binary_files": false
     }
@@ -725,7 +725,7 @@ def api_generate():
         return jsonify({'error': 'Invalid request data'}), 400
         
     selected_files = data.get('selected_files', [])
-    max_size_kb = data.get('max_size_kb', 250)
+    max_size_kb = data.get('max_size_kb', 100)
     include_project_map = data.get('include_project_map', True)
     include_binary_files = data.get('include_binary_files', False)
     
@@ -987,7 +987,7 @@ def api_global_trigger_generate_and_copy():
         respect_gitignore = data.get('respect_gitignore', True)
         respect_pathignore = data.get('respect_pathignore', True)
         pathignore_patterns = data.get('pathignore_patterns', []) # Expecting parsed patterns
-        max_size_kb = int(data.get('max_size_kb', 250))
+        max_size_kb = int(data.get('max_size_kb', 100))
 
         if not absolute_root or not os.path.exists(absolute_root) or not os.path.isdir(absolute_root):
             return jsonify({'error': 'Invalid or missing absolute_root path in request.'}), 400

@@ -46,8 +46,13 @@
 
                 <!-- Settings Section -->
                 <div class="settings-section">
-                    <h5><i class="fas fa-cog"></i> Settings</h5>
-
+                    <div class="settings-header">
+                        <h5><i class="fas fa-sliders-h"></i> Settings</h5>
+                        <button class="btn btn-sm btn-outline-secondary toggle-settings-button">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <div class="settings-content">
                     <!-- Ignore File Controls -->
                     <div class="form-group">
                         <div class="custom-control custom-switch">
@@ -98,8 +103,8 @@ __pycache__/</textarea>
                         <label for="size-slider">Maximum File Size:</label>
                         <div class="d-flex align-items-center">
                             <input type="range" id="size-slider" class="form-control-range" min="25" max="500" step="25"
-                                value="250">
-                            <span id="size-slider-value">250 KB</span>
+                                value="100">
+                            <span id="size-slider-value">100 KB</span>
                         </div>
                     </div>
 
@@ -275,6 +280,7 @@ __pycache__/</textarea>
                             </button>
                         </div>
                     </div>
+                    </div>
                 </div>
 
                 <!-- Quick Controls -->
@@ -313,7 +319,12 @@ __pycache__/</textarea>
             <div class="col-md-7">
                 <!-- App Title and Info -->
                 <div class="app-title-container">
-                    <h1 class="app-title"><i class="fas fa-code-branch"></i> FilesToAI</h1>
+                    <h1 class="app-title"><i class="fas fa-code-branch"></i> Files<span style="color: var(--accent-color);">To</span>AI</h1>
+                    <!-- Theme Toggle Button -->
+                    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                        <span class="theme-label">Dark</span>
+                    </button>
                 </div>
 
                 <!-- Info Section -->
@@ -381,7 +392,7 @@ __pycache__/</textarea>
 
                 <!-- Output Statistics Section -->
                 <div class="output-section" id="output-stats">
-                    <h5>Output Statistics
+                    <h5><i class="fas fa-chart-bar"></i> Output Statistics
                         <div class="btn-group">
                             <button class="btn btn-outline-secondary copy-stats-button"><i class="fas fa-copy"></i>
                                 Copy</button>
@@ -415,7 +426,7 @@ __pycache__/</textarea>
 
                 <!-- files.txt Output -->
                 <div class="output-section" id="files-output">
-                    <h5>files.txt
+                    <h5><i class="fas fa-file-code"></i> files.txt
                         <div class="btn-group">
                             <button class="btn btn-outline-secondary copy-button"><i class="fas fa-copy"></i>
                                 Copy</button>
@@ -429,7 +440,7 @@ __pycache__/</textarea>
 
                 <!-- project_map.txt Output -->
                 <div class="output-section" id="project-map-output">
-                    <h5>project_map.txt
+                    <h5><i class="fas fa-sitemap"></i> project_map.txt
                         <div class="btn-group">
                             <button class="btn btn-outline-secondary copy-button"><i class="fas fa-copy"></i>
                                 Copy</button>
@@ -462,6 +473,9 @@ __pycache__/</textarea>
     <script src="{{ url_for('static', filename='js/file-tree.js') }}"></script>
     <script>
         $(document).ready(function () {
+            // Initialize theme toggle
+            initializeThemeToggle();
+            
             // Initialize file tree
             initializeFileTree();
 
@@ -959,7 +973,18 @@ Selected Files: ${selectedFilesCount}`;
                 $('.toast-container').append(toast);
 
                 // Trigger animation
-                setTimeout(() => toast.addClass('show'), 10);
+                setTimeout(() => {
+                    toast.addClass('show');
+                    // Debug: log toast dimensions
+                    console.log('Toast dimensions:', {
+                        height: toast.outerHeight(),
+                        innerHeight: toast.height(),
+                        padding: toast.css('padding'),
+                        lineHeight: toast.css('line-height'),
+                        fontSize: toast.css('font-size'),
+                        computedStyles: window.getComputedStyle(toast[0])
+                    });
+                }, 10);
 
                 // Auto remove after delay
                 setTimeout(() => {
@@ -1364,6 +1389,38 @@ Selected Files: ${selectedFilesCount}`;
                 // A slight delay might be good to ensure the DOM is updated.
                 setTimeout(sendCurrentSelectionToServer, 100);
             });
+
+            // --- Theme Toggle ---
+            function initializeThemeToggle() {
+                const themeToggle = $('#theme-toggle');
+                const themeLabel = $('.theme-label');
+                const themeIcon = themeToggle.find('i');
+                
+                // Check for saved theme preference or default to 'dark'
+                const currentTheme = localStorage.getItem('theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', currentTheme);
+                updateThemeButton(currentTheme);
+                
+                // Toggle theme on button click
+                themeToggle.on('click', function() {
+                    let theme = document.documentElement.getAttribute('data-theme');
+                    let newTheme = theme === 'dark' ? 'light' : 'dark';
+                    
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    updateThemeButton(newTheme);
+                });
+                
+                function updateThemeButton(theme) {
+                    if (theme === 'dark') {
+                        themeIcon.removeClass('fa-sun').addClass('fa-moon');
+                        themeLabel.text('Dark');
+                    } else {
+                        themeIcon.removeClass('fa-moon').addClass('fa-sun');
+                        themeLabel.text('Light');
+                    }
+                }
+            }
 
             // --- Global Hotkey Toggle ---
             function initializeGlobalHotkeyToggle() {

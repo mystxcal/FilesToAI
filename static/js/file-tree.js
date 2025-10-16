@@ -30,20 +30,79 @@ function initializeFileTree() {
 
     // Initialize info section toggle
     initializeInfoSection();
+    
+    // Initialize settings section toggle
+    initializeSettingsSection();
 }
 
 function initializeInfoSection() {
+    // Set initial icon state based on content visibility
+    const content = $('.info-content');
+    const button = $('.toggle-info-button');
+    console.log('Info section init - content visible:', content.is(':visible'));
+    if (content.is(':visible')) {
+        button.html('<i class="fas fa-chevron-up"></i>');
+        console.log('Info chevron set to UP');
+    } else {
+        button.html('<i class="fas fa-chevron-down"></i>');
+        console.log('Info chevron set to DOWN');
+    }
+    
     $('.info-header').on('click', function() {
         const content = $(this).siblings('.info-content');
-        const icon = $(this).find('.toggle-info-button i');
-
+        const button = $(this).find('.toggle-info-button');
+        const header = $(this).closest('.info-header');
+        
+        console.log('Info header clicked - before toggle, visible:', content.is(':visible'));
+        
+        // Toggle content first, then update icon based on new state
         content.slideToggle(200, function() {
-            if (content.is(':visible')) {
-                icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
-                $(this).closest('.info-header').css('margin-bottom', '10px'); // Add margin when open
+            // After animation completes, set icon based on visibility
+            const isVisible = content.is(':visible');
+            console.log('Info toggle complete - now visible:', isVisible);
+            if (isVisible) {
+                button.html('<i class="fas fa-chevron-up"></i>');
+                header.css('margin-bottom', '10px');
+                console.log('Info chevron changed to UP');
             } else {
-                icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
-                $(this).closest('.info-header').css('margin-bottom', '0'); // Remove margin when closed
+                button.html('<i class="fas fa-chevron-down"></i>');
+                header.css('margin-bottom', '0');
+                console.log('Info chevron changed to DOWN');
+            }
+        });
+    });
+}
+
+function initializeSettingsSection() {
+    // Set initial icon state based on content visibility
+    const content = $('.settings-content');
+    const button = $('.toggle-settings-button');
+    console.log('Settings section init - content visible:', content.is(':visible'));
+    if (content.is(':visible')) {
+        button.html('<i class="fas fa-chevron-up"></i>');
+        console.log('Settings chevron set to UP');
+    } else {
+        button.html('<i class="fas fa-chevron-down"></i>');
+        console.log('Settings chevron set to DOWN');
+    }
+    
+    $('.settings-header').on('click', function() {
+        const content = $(this).siblings('.settings-content');
+        const button = $(this).find('.toggle-settings-button');
+        
+        console.log('Settings header clicked - before toggle, visible:', content.is(':visible'));
+        
+        // Toggle content first, then update icon based on new state
+        content.slideToggle(200, function() {
+            // After animation completes, set icon based on visibility
+            const isVisible = content.is(':visible');
+            console.log('Settings toggle complete - now visible:', isVisible);
+            if (isVisible) {
+                button.html('<i class="fas fa-chevron-up"></i>');
+                console.log('Settings chevron changed to UP');
+            } else {
+                button.html('<i class="fas fa-chevron-down"></i>');
+                console.log('Settings chevron changed to DOWN');
             }
         });
     });
@@ -484,20 +543,4 @@ function updateSelectedCount() {
     }
 }
 
-// Helper function to show toast notifications
-function showToast(message, type = 'info') {
-    const toast = $('<div>')
-        .addClass(`toast toast-${type}`)
-        .text(message);
-
-    $('.toast-container').append(toast);
-
-    // Trigger animation
-    setTimeout(() => toast.addClass('show'), 10);
-
-    // Auto remove after delay
-    setTimeout(() => {
-        toast.removeClass('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
+// Note: showToast is defined in index.html inline script, not here
