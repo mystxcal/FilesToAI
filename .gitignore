@@ -6,6 +6,7 @@
 !app.py
 !README.md
 !global_hotkey_listener.py
+!requirements.txt
 
 # Keep templates directory with index.html
 !templates/
